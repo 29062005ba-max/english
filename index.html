@@ -211,7 +211,7 @@
     <section class="view active" id="v-home">
       <div class="stats">
         <div class="card stat"><div class="lab">Выучено слов</div><div class="num" id="stWords">0 <small>/ 100</small></div><div class="mini"><i id="stWordsBar"></i></div></div>
-        <div class="card stat"><div class="lab">Уроков пройдено</div><div class="num" id="stLessons">0 <small>/ 4</small></div><div class="mini"><i id="stLessonsBar"></i></div></div>
+        <div class="card stat"><div class="lab">Уроков пройдено</div><div class="num" id="stLessons">0 <small>/ 16</small></div><div class="mini"><i id="stLessonsBar"></i></div></div>
       </div>
 
       <div class="block-h"><span class="t">Час практики</span><span class="s">~1 час в день</span></div>
@@ -220,7 +220,7 @@
       <div class="go-row" id="goRow"></div>
 
       <button class="reset-link" id="resetBtn">Сбросить весь прогресс</button>
-      <div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px;">сборка 3 · версия для телефона</div>
+      <div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px;">сборка 5 · курс A1–B2 (этап 1)</div>
     </section>
 
     <!-- ============ WORDS ============ -->
@@ -238,6 +238,7 @@
       <div class="vtitle">Аудио</div>
       <p class="vsub">Нажми 🔊 и слушай. Перевод можно скрыть и проверять себя.</p>
       <div class="toggle-row"><span>Показывать перевод</span><div class="sw on" id="trToggle"></div></div>
+      <div class="toggle-row"><span>Медленная озвучка</span><div class="sw" id="slowToggle"></div></div>
       <div class="chips" id="listenThemes"></div>
       <div id="listenList"></div>
     </section>
@@ -247,6 +248,13 @@
       <div class="vtitle">Грамматика</div>
       <p class="vsub">Короткие уроки A1 + упражнения с проверкой. Примеры можно прослушать.</p>
       <div id="lessons"></div>
+    </section>
+
+    <!-- ============ PRACTICE ============ -->
+    <section class="view" id="v-practice">
+      <div class="vtitle">Тренажёр</div>
+      <p class="vsub">10 случайных вопросов: слова (EN↔RU), аудио и грамматика. Проверь себя.</p>
+      <div id="practiceArea"></div>
     </section>
 
     <!-- ============ CHAT ============ -->
@@ -293,7 +301,7 @@ var state={srs:{},lessons:[]};
 function persist(){saveState(state);}
 
 /* ---------------- TTS ---------------- */
-var enVoice=null;
+var enVoice=null, ttsRate=0.9;
 function pickVoice(){try{var vs=speechSynthesis.getVoices();enVoice=vs.find(function(v){return /en[-_]US/i.test(v.lang);})||vs.find(function(v){return /^en/i.test(v.lang);})||null;}catch(e){}}
 if("speechSynthesis" in window){pickVoice();try{speechSynthesis.onvoiceschanged=pickVoice;}catch(e){}}
 function speak(text){
@@ -302,7 +310,7 @@ function speak(text){
     speechSynthesis.cancel();
     if(!enVoice)pickVoice();
     var u=new SpeechSynthesisUtterance(text);
-    u.lang="en-US";if(enVoice)u.voice=enVoice;u.rate=0.9;u.pitch=1;
+    u.lang="en-US";if(enVoice)u.voice=enVoice;u.rate=ttsRate;u.pitch=1;
     speechSynthesis.speak(u);
   }catch(e){}
 }
@@ -312,83 +320,9 @@ function speakEn(text){
 }
 
 /* ---------------- data ---------------- */
-var THEMES=[
-  {id:"daily",name:"Быт",words:[
-    ["water","вода"],["food","еда"],["house","дом"],["time","время"],["day","день"],["money","деньги"],
-    ["to want","хотеть"],["to have","иметь"],["good","хороший"],["big","большой"],["now","сейчас"],["here","здесь"],["work","работа"],["people","люди"]
-  ],phrases:[
-    ["Hello, how are you?","Привет, как дела?"],["Thank you very much.","Большое спасибо."],
-    ["I don't understand.","Я не понимаю."],["Can you help me?","Можете мне помочь?"],
-    ["What is your name?","Как тебя зовут?"],["See you tomorrow.","Увидимся завтра."]
-  ]},
-  {id:"travel",name:"Путешествия",words:[
-    ["airport","аэропорт"],["ticket","билет"],["passport","паспорт"],["luggage","багаж"],["flight","рейс"],
-    ["taxi","такси"],["map","карта"],["left","налево"],["right","направо"],["straight","прямо"],["far","далеко"],["near","близко"],["where","где"],["to arrive","прибывать"]
-  ],phrases:[
-    ["Where is the airport?","Где аэропорт?"],["How much is the ticket?","Сколько стоит билет?"],
-    ["I would like a taxi.","Мне нужно такси."],["Is it far from here?","Это далеко отсюда?"],
-    ["Turn left, please.","Поверните налево, пожалуйста."],["I am lost.","Я заблудился."]
-  ]},
-  {id:"hotel",name:"Отель",words:[
-    ["room","номер"],["key","ключ"],["bed","кровать"],["to book","бронировать"],["night","ночь"],["breakfast","завтрак"],
-    ["floor","этаж"],["towel","полотенце"],["price","цена"],["to pay","платить"],["free","свободный"],["clean","чистый"],["luggage","багаж"],["help","помощь"]
-  ],phrases:[
-    ["I have a reservation.","У меня есть бронь."],["Can I check in?","Можно заселиться?"],
-    ["Is breakfast included?","Завтрак включён?"],["The key, please.","Ключ, пожалуйста."],
-    ["What floor is my room on?","На каком этаже мой номер?"],["Do you have a free room?","У вас есть свободный номер?"]
-  ]},
-  {id:"food",name:"Ресторан",words:[
-    ["menu","меню"],["bill","счёт"],["table","столик"],["to order","заказывать"],["fork","вилка"],["spoon","ложка"],
-    ["knife","нож"],["delicious","вкусный"],["drink","напиток"],["coffee","кофе"],["tea","чай"],["dish","блюдо"],["waiter","официант"],["water","вода"]
-  ],phrases:[
-    ["A table for two, please.","Столик на двоих, пожалуйста."],["Can I see the menu?","Можно меню?"],
-    ["I would like a coffee.","Мне, пожалуйста, кофе."],["The bill, please.","Счёт, пожалуйста."],
-    ["This is delicious.","Это вкусно."],["Do you have water?","У вас есть вода?"]
-  ]},
-  {id:"work",name:"Деловое",words:[
-    ["email","письмо"],["meeting","встреча"],["to send","отправлять"],["document","документ"],["deadline","срок"],["to call","звонить"],
-    ["client","клиент"],["to confirm","подтвердить"],["report","отчёт"],["payment","оплата"],["contract","договор"],["price","цена"],["schedule","расписание"],["to discuss","обсуждать"]
-  ],phrases:[
-    ["I will send the email today.","Я отправлю письмо сегодня."],["Can we schedule a meeting?","Можем назначить встречу?"],
-    ["I will call you tomorrow.","Я позвоню тебе завтра."],["Please confirm the price.","Пожалуйста, подтвердите цену."],
-    ["I received your document.","Я получил ваш документ."],["Let's discuss the contract.","Давайте обсудим договор."]
-  ]}
-];
+var THEMES=[{"id": "daily", "name": "Быт", "level": "A1", "words": [["water", "вода"], ["food", "еда"], ["house", "дом"], ["room", "комната"], ["door", "дверь"], ["table", "стол"], ["time", "время"], ["day", "день"], ["week", "неделя"], ["today", "сегодня"], ["tomorrow", "завтра"], ["now", "сейчас"], ["here", "здесь"], ["there", "там"], ["good", "хороший"], ["bad", "плохой"], ["big", "большой"], ["small", "маленький"], ["people", "люди"], ["friend", "друг"]], "phrases": [["Hello, how are you?", "Привет, как дела?"], ["Thank you very much.", "Большое спасибо."], ["I don't understand.", "Я не понимаю."], ["Can you help me?", "Можете мне помочь?"], ["What is your name?", "Как тебя зовут?"], ["See you tomorrow.", "Увидимся завтра."], ["Have a good day!", "Хорошего дня!"], ["Excuse me, please.", "Извините, пожалуйста."]]}, {"id": "travel", "name": "Путешествия", "level": "A1", "words": [["airport", "аэропорт"], ["ticket", "билет"], ["passport", "паспорт"], ["luggage", "багаж"], ["flight", "рейс"], ["train", "поезд"], ["bus", "автобус"], ["taxi", "такси"], ["map", "карта"], ["street", "улица"], ["city", "город"], ["left", "налево"], ["right", "направо"], ["straight", "прямо"], ["far", "далеко"], ["near", "близко"], ["to arrive", "прибывать"], ["to leave", "уезжать"], ["station", "станция"], ["suitcase", "чемодан"]], "phrases": [["Where is the airport?", "Где аэропорт?"], ["How much is the ticket?", "Сколько стоит билет?"], ["I would like a taxi.", "Мне нужно такси."], ["Is it far from here?", "Это далеко отсюда?"], ["Turn left, please.", "Поверните налево, пожалуйста."], ["I am lost.", "Я заблудился."], ["When does the train leave?", "Когда отправляется поезд?"], ["Where is the station?", "Где вокзал?"]]}, {"id": "hotel", "name": "Отель", "level": "A2", "words": [["room", "номер"], ["key", "ключ"], ["bed", "кровать"], ["night", "ночь"], ["breakfast", "завтрак"], ["floor", "этаж"], ["towel", "полотенце"], ["shower", "душ"], ["price", "цена"], ["to pay", "платить"], ["to book", "бронировать"], ["free", "свободный"], ["clean", "чистый"], ["reception", "ресепшн"], ["guest", "гость"], ["check-in", "заселение"], ["check-out", "выезд"], ["lift", "лифт"], ["window", "окно"], ["quiet", "тихий"]], "phrases": [["I have a reservation.", "У меня есть бронь."], ["Can I check in?", "Можно заселиться?"], ["Is breakfast included?", "Завтрак включён?"], ["The key, please.", "Ключ, пожалуйста."], ["What floor is my room on?", "На каком этаже мой номер?"], ["Do you have a free room?", "У вас есть свободный номер?"], ["The room is very nice.", "Номер очень хороший."], ["Where is the lift?", "Где лифт?"]]}, {"id": "food", "name": "Ресторан", "level": "A1", "words": [["menu", "меню"], ["bill", "счёт"], ["table", "столик"], ["waiter", "официант"], ["to order", "заказывать"], ["fork", "вилка"], ["spoon", "ложка"], ["knife", "нож"], ["plate", "тарелка"], ["glass", "стакан"], ["drink", "напиток"], ["coffee", "кофе"], ["tea", "чай"], ["water", "вода"], ["bread", "хлеб"], ["soup", "суп"], ["meat", "мясо"], ["fish", "рыба"], ["delicious", "вкусный"], ["dish", "блюдо"]], "phrases": [["A table for two, please.", "Столик на двоих, пожалуйста."], ["Can I see the menu?", "Можно меню?"], ["I would like a coffee.", "Мне, пожалуйста, кофе."], ["The bill, please.", "Счёт, пожалуйста."], ["This is delicious.", "Это вкусно."], ["Do you have water?", "У вас есть вода?"], ["I am hungry.", "Я голоден."], ["Can I have the menu in English?", "Можно меню на английском?"]]}, {"id": "work", "name": "Деловое", "level": "A2", "words": [["email", "письмо"], ["meeting", "встреча"], ["document", "документ"], ["deadline", "срок"], ["client", "клиент"], ["report", "отчёт"], ["payment", "оплата"], ["contract", "договор"], ["price", "цена"], ["schedule", "расписание"], ["office", "офис"], ["manager", "менеджер"], ["project", "проект"], ["to send", "отправлять"], ["to call", "звонить"], ["to confirm", "подтвердить"], ["to discuss", "обсуждать"], ["to sign", "подписать"], ["invoice", "счёт-фактура"], ["deal", "сделка"]], "phrases": [["I will send the email today.", "Я отправлю письмо сегодня."], ["Can we schedule a meeting?", "Можем назначить встречу?"], ["I will call you tomorrow.", "Я позвоню тебе завтра."], ["Please confirm the price.", "Пожалуйста, подтвердите цену."], ["I received your document.", "Я получил ваш документ."], ["Let's discuss the contract.", "Давайте обсудим договор."], ["Can you send me the report?", "Можете прислать мне отчёт?"], ["The meeting is at 3 PM.", "Встреча в 3 часа дня."]]}, {"id": "numtime", "name": "Числа и время", "level": "A1", "words": [["one", "один"], ["two", "два"], ["three", "три"], ["four", "четыре"], ["five", "пять"], ["ten", "десять"], ["hundred", "сто"], ["first", "первый"], ["hour", "час"], ["minute", "минута"], ["morning", "утро"], ["afternoon", "после полудня"], ["evening", "вечер"], ["night", "ночь"], ["Monday", "понедельник"], ["Friday", "пятница"], ["weekend", "выходные"], ["month", "месяц"], ["year", "год"], ["o'clock", "часов"]], "phrases": [["What time is it?", "Который час?"], ["It is five o'clock.", "Сейчас пять часов."], ["See you at ten.", "Увидимся в десять."], ["I work five days a week.", "Я работаю пять дней в неделю."], ["Today is Monday.", "Сегодня понедельник."], ["In the morning.", "Утром."]]}, {"id": "people", "name": "Люди и семья", "level": "A1", "words": [["man", "мужчина"], ["woman", "женщина"], ["child", "ребёнок"], ["boy", "мальчик"], ["girl", "девочка"], ["mother", "мать"], ["father", "отец"], ["brother", "брат"], ["sister", "сестра"], ["family", "семья"], ["name", "имя"], ["young", "молодой"], ["old", "старый"], ["happy", "счастливый"], ["tired", "уставший"], ["husband", "муж"], ["wife", "жена"], ["son", "сын"], ["daughter", "дочь"], ["friend", "друг"]], "phrases": [["This is my friend.", "Это мой друг."], ["I have a sister.", "У меня есть сестра."], ["How old are you?", "Сколько тебе лет?"], ["My family is big.", "Моя семья большая."], ["Nice to meet you.", "Приятно познакомиться."], ["He is a good man.", "Он хороший человек."]]}, {"id": "shopping", "name": "Покупки", "level": "A2", "words": [["shop", "магазин"], ["money", "деньги"], ["price", "цена"], ["to buy", "покупать"], ["to sell", "продавать"], ["cheap", "дешёвый"], ["expensive", "дорогой"], ["card", "карта"], ["cash", "наличные"], ["size", "размер"], ["clothes", "одежда"], ["shoes", "обувь"], ["bag", "сумка"], ["gift", "подарок"], ["to cost", "стоить"], ["sale", "распродажа"], ["change", "сдача"], ["color", "цвет"], ["new", "новый"], ["to choose", "выбирать"]], "phrases": [["How much does it cost?", "Сколько это стоит?"], ["It is too expensive.", "Это слишком дорого."], ["Can I pay by card?", "Можно оплатить картой?"], ["Do you have a bigger size?", "Есть размер побольше?"], ["I want to buy this.", "Я хочу это купить."], ["Where is the shop?", "Где магазин?"]]}, {"id": "verbs", "name": "Глаголы", "level": "A1", "words": [["to go", "идти"], ["to come", "приходить"], ["to eat", "есть"], ["to drink", "пить"], ["to see", "видеть"], ["to know", "знать"], ["to want", "хотеть"], ["to have", "иметь"], ["to make", "делать"], ["to take", "брать"], ["to give", "давать"], ["to say", "сказать"], ["to work", "работать"], ["to read", "читать"], ["to write", "писать"], ["to speak", "говорить"], ["to think", "думать"], ["to need", "нуждаться"], ["to like", "нравиться"], ["to help", "помогать"]], "phrases": [["I want to learn English.", "Я хочу учить английский."], ["I need some help.", "Мне нужна помощь."], ["Do you speak English?", "Ты говоришь по-английски?"], ["I like this song.", "Мне нравится эта песня."], ["Can you say it again?", "Можешь сказать это ещё раз?"], ["I have to go now.", "Мне нужно идти."]]}, {"id": "adj", "name": "Прилагательные", "level": "A2", "words": [["hot", "горячий"], ["cold", "холодный"], ["easy", "лёгкий"], ["hard", "трудный"], ["fast", "быстрый"], ["slow", "медленный"], ["beautiful", "красивый"], ["important", "важный"], ["ready", "готовый"], ["busy", "занятый"], ["nice", "приятный"], ["clean", "чистый"], ["dirty", "грязный"], ["full", "полный"], ["empty", "пустой"], ["right", "правильный"], ["wrong", "неправильный"], ["strong", "сильный"], ["dark", "тёмный"], ["light", "светлый"]], "phrases": [["It is very hot today.", "Сегодня очень жарко."], ["This is easy.", "Это легко."], ["You are right.", "Ты прав."], ["I am ready.", "Я готов."], ["The coffee is cold.", "Кофе холодный."], ["She is very busy.", "Она очень занята."]]}, {"id": "home2", "name": "Дом и вещи", "level": "A1", "words": [["wall", "стена"], ["floor", "пол"], ["chair", "стул"], ["lamp", "лампа"], ["kitchen", "кухня"], ["bathroom", "ванная"], ["fridge", "холодильник"], ["phone", "телефон"], ["computer", "компьютер"], ["book", "книга"], ["pen", "ручка"], ["clock", "часы"], ["mirror", "зеркало"], ["sofa", "диван"], ["cup", "чашка"], ["light", "свет"]], "phrases": [["Where is the bathroom?", "Где ванная?"], ["Turn on the light, please.", "Включи свет, пожалуйста."], ["This is my room.", "Это моя комната."], ["I need a chair.", "Мне нужен стул."], ["The phone is on the table.", "Телефон на столе."], ["Open the window.", "Открой окно."]]}, {"id": "body", "name": "Тело и здоровье", "level": "A2", "words": [["head", "голова"], ["eye", "глаз"], ["hand", "рука"], ["leg", "нога"], ["foot", "ступня"], ["hair", "волосы"], ["tooth", "зуб"], ["heart", "сердце"], ["stomach", "живот"], ["doctor", "врач"], ["medicine", "лекарство"], ["pain", "боль"], ["sick", "больной"], ["healthy", "здоровый"], ["hospital", "больница"], ["fever", "температура"]], "phrases": [["I feel sick.", "Я плохо себя чувствую."], ["I have a headache.", "У меня болит голова."], ["I need a doctor.", "Мне нужен врач."], ["Where does it hurt?", "Где болит?"], ["Take this medicine.", "Прими это лекарство."], ["Get well soon!", "Выздоравливай!"]]}, {"id": "weather", "name": "Погода и природа", "level": "A2", "words": [["sun", "солнце"], ["rain", "дождь"], ["snow", "снег"], ["wind", "ветер"], ["cloud", "облако"], ["sky", "небо"], ["sea", "море"], ["river", "река"], ["mountain", "гора"], ["tree", "дерево"], ["warm", "тёплый"], ["rainy", "дождливый"], ["sunny", "солнечный"], ["weather", "погода"], ["ice", "лёд"], ["storm", "буря"]], "phrases": [["It is raining.", "Идёт дождь."], ["The weather is nice today.", "Сегодня хорошая погода."], ["It is cold outside.", "На улице холодно."], ["Is it going to rain?", "Будет дождь?"], ["The sun is shining.", "Светит солнце."], ["I love the sea.", "Я люблю море."]]}, {"id": "city", "name": "Город и места", "level": "A2", "words": [["bank", "банк"], ["hospital", "больница"], ["school", "школа"], ["park", "парк"], ["market", "рынок"], ["church", "церковь"], ["museum", "музей"], ["library", "библиотека"], ["pharmacy", "аптека"], ["post office", "почта"], ["square", "площадь"], ["bridge", "мост"], ["building", "здание"], ["corner", "угол"], ["center", "центр"], ["road", "дорога"]], "phrases": [["Where is the bank?", "Где банк?"], ["Is there a pharmacy near here?", "Здесь рядом есть аптека?"], ["How do I get to the center?", "Как добраться до центра?"], ["The museum is closed.", "Музей закрыт."], ["Go to the corner.", "Идите до угла."], ["It is next to the park.", "Это рядом с парком."]]}, {"id": "jobs", "name": "Работа и профессии", "level": "A2", "words": [["job", "работа"], ["teacher", "учитель"], ["driver", "водитель"], ["cook", "повар"], ["engineer", "инженер"], ["lawyer", "юрист"], ["seller", "продавец"], ["boss", "начальник"], ["salary", "зарплата"], ["company", "компания"], ["colleague", "коллега"], ["interview", "собеседование"], ["experience", "опыт"], ["task", "задача"], ["nurse", "медсестра"], ["worker", "рабочий"]], "phrases": [["What is your job?", "Кем ты работаешь?"], ["I work as an engineer.", "Я работаю инженером."], ["I have an interview tomorrow.", "У меня завтра собеседование."], ["She is my colleague.", "Она моя коллега."], ["I am very busy at work.", "Я очень занят на работе."], ["The salary is good.", "Зарплата хорошая."]]}, {"id": "emotions", "name": "Эмоции", "level": "B1", "words": [["sad", "грустный"], ["angry", "злой"], ["afraid", "испуганный"], ["surprised", "удивлённый"], ["bored", "скучающий"], ["excited", "взволнованный"], ["calm", "спокойный"], ["worried", "обеспокоенный"], ["proud", "гордый"], ["lonely", "одинокий"], ["confident", "уверенный"], ["nervous", "нервный"], ["glad", "рад"], ["upset", "расстроенный"], ["relaxed", "расслабленный"], ["scared", "напуганный"]], "phrases": [["I am very happy.", "Я очень рад."], ["Why are you sad?", "Почему ты грустишь?"], ["Don't be afraid.", "Не бойся."], ["I am a little nervous.", "Я немного нервничаю."], ["She looks worried.", "Она выглядит обеспокоенной."], ["I feel calm now.", "Сейчас я спокоен."]]}, {"id": "tech", "name": "Технологии", "level": "B1", "words": [["internet", "интернет"], ["password", "пароль"], ["screen", "экран"], ["file", "файл"], ["app", "приложение"], ["message", "сообщение"], ["button", "кнопка"], ["link", "ссылка"], ["to download", "скачивать"], ["update", "обновление"], ["account", "аккаунт"], ["network", "сеть"], ["device", "устройство"], ["software", "программа"], ["battery", "батарея"], ["search", "поиск"]], "phrases": [["What is the password?", "Какой пароль?"], ["Send me the file, please.", "Пришли мне файл, пожалуйста."], ["The internet is slow.", "Интернет медленный."], ["Click the button.", "Нажми кнопку."], ["I got your message.", "Я получил твоё сообщение."], ["Update the app.", "Обнови приложение."]]}, {"id": "money", "name": "Деньги и банк", "level": "B1", "words": [["savings", "сбережения"], ["loan", "кредит"], ["debt", "долг"], ["to borrow", "занимать"], ["to lend", "одалживать"], ["to save", "копить"], ["to spend", "тратить"], ["tax", "налог"], ["rich", "богатый"], ["poor", "бедный"], ["coin", "монета"], ["wallet", "кошелёк"], ["account", "счёт"], ["interest", "процент"], ["budget", "бюджет"], ["to earn", "зарабатывать"]], "phrases": [["I need to go to the bank.", "Мне нужно в банк."], ["Can I pay in cash?", "Можно оплатить наличными?"], ["How much do I owe?", "Сколько я должен?"], ["I want to save money.", "Я хочу копить деньги."], ["It is too expensive.", "Это слишком дорого."], ["Do you accept cards?", "Вы принимаете карты?"]]}];
 
-var LESSONS=[
-  {id:"present",title:"Present Simple — настоящее",
-   expl:"Используем для фактов и привычек. Глагол не меняется, НО в 3-м лице (he / she / it) добавляем -s. Пример: I work — He works.",
-   ex:[["I live in Almaty.","Я живу в Алматы."],["She likes tea.","Она любит чай."],["We work every day.","Мы работаем каждый день."]],
-   quiz:[
-     {q:"He ___ coffee every morning.",o:["drink","drinks","drinking"],a:1,w:"he / she / it → глагол с -s: drinks."},
-     {q:"I ___ in a bank.",o:["works","work","working"],a:1,w:"С I — без -s: work."},
-     {q:"They ___ English.",o:["studies","study","studys"],a:1,w:"С they — без -s: study."}
-   ]},
-  {id:"questions",title:"Вопросы — do / does",
-   expl:"Вопрос в настоящем строим через do / does. С he / she / it → does (и глагол теряет -s). Do you work? — Does she work?",
-   ex:[["Do you speak English?","Ты говоришь по-английски?"],["Does he have a car?","У него есть машина?"],["Where do you live?","Где ты живёшь?"]],
-   quiz:[
-     {q:"___ you like coffee?",o:["Does","Do","Are"],a:1,w:"С you → Do."},
-     {q:"___ she work here?",o:["Do","Does","Is"],a:1,w:"С she → Does."},
-     {q:"Where ___ they go?",o:["does","do","is"],a:1,w:"С they → do."}
-   ]},
-  {id:"past",title:"Past Simple — прошедшее",
-   expl:"Правильные глаголы получают -ed: work → worked. Неправильные надо запоминать: go → went, send → sent, see → saw.",
-   ex:[["I worked yesterday.","Я работал вчера."],["She went home.","Она пошла домой."],["We saw a film.","Мы посмотрели фильм."]],
-   quiz:[
-     {q:"Yesterday I ___ to work.",o:["go","went","goes"],a:1,w:"go — неправильный: went."},
-     {q:"She ___ the email.",o:["send","sended","sent"],a:2,w:"send → sent."},
-     {q:"They ___ in a hotel.",o:["stayed","stay","stays"],a:0,w:"Правильный глагол + -ed: stayed."}
-   ]},
-  {id:"future",title:"Future — will / going to",
-   expl:"will + глагол — решение сейчас, обещание. be going to + глагол — план. I will call you. / I am going to travel.",
-   ex:[["I will help you.","Я помогу тебе."],["We are going to travel.","Мы собираемся в поездку."],["She will come tomorrow.","Она придёт завтра."]],
-   quiz:[
-     {q:"I ___ call you later.",o:["will","am","go"],a:0,w:"will + глагол: will call."},
-     {q:"We are ___ to book a hotel.",o:["go","going","will"],a:1,w:"be going to: are going to."},
-     {q:"They ___ arrive at 5.",o:["will","are","do"],a:0,w:"will + arrive."}
-   ]}
-];
+var LESSONS=[{"id": "present", "title": "Present Simple — настоящее", "expl": "Используем для фактов и привычек. Глагол не меняется, НО в 3-м лице (he / she / it) добавляем -s. Пример: I work — He works.", "ex": [["I live in Almaty.", "Я живу в Алматы."], ["She likes tea.", "Она любит чай."], ["We work every day.", "Мы работаем каждый день."]], "quiz": [{"q": "He ___ coffee every morning.", "o": ["drink", "drinks", "drinking"], "a": 1, "w": "he / she / it → глагол с -s: drinks."}, {"q": "I ___ in a bank.", "o": ["works", "work", "working"], "a": 1, "w": "С I — без -s: work."}, {"q": "They ___ English.", "o": ["studies", "study", "studys"], "a": 1, "w": "С they — без -s: study."}]}, {"id": "questions", "title": "Вопросы — do / does", "expl": "Вопрос в настоящем строим через do / does. С he / she / it → does (и глагол теряет -s). Do you work? — Does she work?", "ex": [["Do you speak English?", "Ты говоришь по-английски?"], ["Does he have a car?", "У него есть машина?"], ["Where do you live?", "Где ты живёшь?"]], "quiz": [{"q": "___ you like coffee?", "o": ["Does", "Do", "Are"], "a": 1, "w": "С you → Do."}, {"q": "___ she work here?", "o": ["Do", "Does", "Is"], "a": 1, "w": "С she → Does."}, {"q": "Where ___ they go?", "o": ["does", "do", "is"], "a": 1, "w": "С they → do."}]}, {"id": "past", "title": "Past Simple — прошедшее", "expl": "Правильные глаголы получают -ed: work → worked. Неправильные надо запоминать: go → went, send → sent, see → saw.", "ex": [["I worked yesterday.", "Я работал вчера."], ["She went home.", "Она пошла домой."], ["We saw a film.", "Мы посмотрели фильм."]], "quiz": [{"q": "Yesterday I ___ to work.", "o": ["go", "went", "goes"], "a": 1, "w": "go — неправильный: went."}, {"q": "She ___ the email.", "o": ["send", "sended", "sent"], "a": 2, "w": "send → sent."}, {"q": "They ___ in a hotel.", "o": ["stayed", "stay", "stays"], "a": 0, "w": "Правильный глагол + -ed: stayed."}]}, {"id": "future", "title": "Future — will / going to", "expl": "will + глагол — решение сейчас, обещание. be going to + глагол — план. I will call you. / I am going to travel.", "ex": [["I will help you.", "Я помогу тебе."], ["We are going to travel.", "Мы собираемся в поездку."], ["She will come tomorrow.", "Она придёт завтра."]], "quiz": [{"q": "I ___ call you later.", "o": ["will", "am", "go"], "a": 0, "w": "will + глагол: will call."}, {"q": "We are ___ to book a hotel.", "o": ["go", "going", "will"], "a": 1, "w": "be going to: are going to."}, {"q": "They ___ arrive at 5.", "o": ["will", "are", "do"], "a": 0, "w": "will + arrive."}]}, {"id": "articles", "title": "Артикли — a / an / the", "expl": "a / an — когда говорим о предмете впервые (an — перед гласным звуком). the — когда понятно, о каком именно. a car, an apple, the sun.", "ex": [["I have a car.", "У меня есть машина."], ["She eats an apple.", "Она ест яблоко."], ["The sun is hot.", "Солнце горячее."]], "quiz": [{"q": "I see ___ dog.", "o": ["a", "an", "the"], "a": 0, "w": "Согласный звук → a: a dog."}, {"q": "She has ___ umbrella.", "o": ["a", "an", "the"], "a": 1, "w": "Гласный звук → an: an umbrella."}, {"q": "___ Earth is round.", "o": ["A", "An", "The"], "a": 2, "w": "Единственный, понятный объект → The."}]}, {"id": "plurals", "title": "Множественное число", "expl": "Добавляем -s: car → cars. После -s / -ch / -sh / -x → -es: box → boxes. Исключения: man → men, child → children.", "ex": [["Two cars.", "Две машины."], ["Three boxes.", "Три коробки."], ["Many children.", "Много детей."]], "quiz": [{"q": "One book, two ___.", "o": ["books", "bookes", "book"], "a": 0, "w": "Обычное слово + -s: books."}, {"q": "One box, two ___.", "o": ["boxs", "boxes", "box"], "a": 1, "w": "После -x → -es: boxes."}, {"q": "One child, two ___.", "o": ["childs", "children", "childes"], "a": 1, "w": "Исключение: child → children."}]}, {"id": "continuous", "title": "Present Continuous — сейчас", "expl": "Для действия прямо сейчас: be (am / is / are) + глагол с -ing. I am working. She is reading.", "ex": [["I am reading now.", "Я сейчас читаю."], ["She is working.", "Она работает (сейчас)."], ["They are eating.", "Они едят (сейчас)."]], "quiz": [{"q": "I ___ reading now.", "o": ["am", "is", "are"], "a": 0, "w": "С I → am: I am reading."}, {"q": "She ___ working.", "o": ["am", "is", "are"], "a": 1, "w": "С she → is."}, {"q": "They are ___.", "o": ["eat", "eating", "eats"], "a": 1, "w": "be + глагол с -ing: eating."}]}, {"id": "thereis", "title": "There is / There are", "expl": "There is — один предмет (ед. число). There are — несколько (мн. число). There is a table. There are two chairs.", "ex": [["There is a problem.", "Есть проблема."], ["There are two rooms.", "Есть две комнаты."], ["Is there a hotel here?", "Здесь есть отель?"]], "quiz": [{"q": "___ a car outside.", "o": ["There is", "There are", "There be"], "a": 0, "w": "Один предмет → There is."}, {"q": "___ many people here.", "o": ["There is", "There are", "There am"], "a": 1, "w": "Много → There are."}, {"q": "___ a problem?", "o": ["Is there", "Are there", "There is"], "a": 0, "w": "Вопрос, ед. ч. → Is there?"}]}, {"id": "compare", "title": "Сравнение — bigger / the best", "expl": "Короткое прилагательное + -er и the …-est: big → bigger → the biggest. Длинное → more / the most: expensive → more expensive. Исключение: good → better → best.", "ex": [["This car is bigger.", "Эта машина больше."], ["She is the best student.", "Она лучшая ученица."], ["English is more useful.", "Английский полезнее."]], "quiz": [{"q": "My house is ___ than yours.", "o": ["big", "bigger", "biggest"], "a": 1, "w": "Сравнение: big → bigger."}, {"q": "This is the ___ film ever.", "o": ["good", "better", "best"], "a": 2, "w": "good → best (the best)."}, {"q": "A car is ___ expensive than a bike.", "o": ["more", "most", "much"], "a": 0, "w": "Длинное слово → more expensive."}]}, {"id": "perfect", "title": "Present Perfect — have + V3", "expl": "have / has + 3-я форма глагола: для опыта и результата без точного времени. Слова: ever, never, already, yet. I have seen it. He has gone.", "ex": [["I have finished my work.", "Я закончил работу."], ["She has never been to London.", "Она никогда не была в Лондоне."], ["Have you eaten yet?", "Ты уже поел?"]], "quiz": [{"q": "I ___ seen this film.", "o": ["have", "has", "am"], "a": 0, "w": "С I → have + 3-я форма: have seen."}, {"q": "She ___ finished.", "o": ["have", "has", "is"], "a": 1, "w": "С she → has."}, {"q": "They have ___ to Paris.", "o": ["go", "went", "been"], "a": 2, "w": "3-я форма be/go → been: have been."}]}, {"id": "modals", "title": "Модальные — can / must / should", "expl": "can — умею / можно; must — должен (обязательно); should — следует (совет). После них глагол без to: I can swim. You must go. You should rest.", "ex": [["I can speak English.", "Я умею говорить по-английски."], ["You must wear a seatbelt.", "Ты должен пристегнуться."], ["You should see a doctor.", "Тебе стоит сходить к врачу."]], "quiz": [{"q": "You ___ stop at a red light.", "o": ["must", "can", "should"], "a": 0, "w": "Обязательно → must."}, {"q": "I ___ swim very well.", "o": ["must", "can", "should"], "a": 1, "w": "Умение → can."}, {"q": "You ___ rest, you look tired.", "o": ["must", "can", "should"], "a": 2, "w": "Совет → should."}]}, {"id": "cond1", "title": "Условные 0 и 1 типа", "expl": "0-й тип (всегда верно): If + present, present — If you heat ice, it melts. 1-й тип (реальное будущее): If + present, will — If it rains, I will stay home.", "ex": [["If you heat ice, it melts.", "Если нагреть лёд, он тает."], ["If it rains, I will stay home.", "Если пойдёт дождь, я останусь дома."], ["If you study, you will pass.", "Если будешь учиться, сдашь."]], "quiz": [{"q": "If it rains, I ___ at home.", "o": ["stay", "will stay", "stayed"], "a": 1, "w": "1-й тип: if + present, will + глагол."}, {"q": "If you heat water, it ___.", "o": ["boils", "will boil", "boiled"], "a": 0, "w": "0-й тип (факт): present → boils."}, {"q": "If you are late, we ___ without you.", "o": ["start", "will start", "started"], "a": 1, "w": "1-й тип → will start."}]}, {"id": "cond2", "title": "Условные 2 типа", "expl": "Нереальное / воображаемое сейчас: If + past, would + глагол. If I had money, I would travel. (после if часто were).", "ex": [["If I had time, I would help.", "Если бы у меня было время, я бы помог."], ["If I were you, I would go.", "На твоём месте я бы пошёл."], ["She would buy it if it were cheaper.", "Она бы купила, будь это дешевле."]], "quiz": [{"q": "If I ___ rich, I would travel.", "o": ["am", "were", "will be"], "a": 1, "w": "2-й тип: if + past (were)."}, {"q": "If I had time, I ___ help you.", "o": ["will", "would", "do"], "a": 1, "w": "2-й тип: would + глагол."}, {"q": "If I were you, I ___ go.", "o": ["will", "would", "am"], "a": 1, "w": "would go."}]}, {"id": "passive", "title": "Пассивный залог — be + V3", "expl": "Когда действие важнее, чем кто его делает: be + 3-я форма глагола. The letter was sent. English is spoken here.", "ex": [["English is spoken here.", "Здесь говорят по-английски."], ["The house was built in 2000.", "Дом построили в 2000."], ["The work is done.", "Работа сделана."]], "quiz": [{"q": "English ___ spoken in many countries.", "o": ["is", "does", "has"], "a": 0, "w": "Пассив: be + 3-я форма → is spoken."}, {"q": "The letter ___ sent yesterday.", "o": ["is", "was", "does"], "a": 1, "w": "Прошлое пассив → was sent."}, {"q": "These cars ___ made in Japan.", "o": ["are", "is", "does"], "a": 0, "w": "Мн. число пассив → are made."}]}, {"id": "reported", "title": "Косвенная речь", "expl": "Передача чужих слов: время часто сдвигается на шаг назад. 'I am tired' → He said he was tired. say (что-то) / tell (кому-то).", "ex": [["He said he was tired.", "Он сказал, что устал."], ["She told me she would come.", "Она сказала мне, что придёт."], ["They said they liked it.", "Они сказали, что им понравилось."]], "quiz": [{"q": "He said he ___ busy.", "o": ["is", "was", "be"], "a": 1, "w": "Сдвиг времени: is → was."}, {"q": "She ___ me that she was late.", "o": ["said", "told", "say"], "a": 1, "w": "Кому-то → told (me)."}, {"q": "They said they ___ tired.", "o": ["are", "were", "is"], "a": 1, "w": "are → were."}]}, {"id": "prep", "title": "Предлоги места — in / on / at", "expl": "in — внутри (in the box), on — на поверхности (on the table), at — в точке / месте (at the door, at work), under — под.", "ex": [["The book is on the table.", "Книга на столе."], ["He is at work.", "Он на работе."], ["The cat is under the chair.", "Кот под стулом."]], "quiz": [{"q": "The keys are ___ the table.", "o": ["on", "in", "at"], "a": 0, "w": "На поверхности → on."}, {"q": "There is milk ___ the fridge.", "o": ["on", "in", "at"], "a": 1, "w": "Внутри → in."}, {"q": "I am ___ the bus stop.", "o": ["on", "in", "at"], "a": 2, "w": "В точке / месте → at."}]}];
 
 var CHAT_TOPICS=["Знакомство","В ресторане","В отеле","В аэропорту","На работе","Свободная тема"];
 
@@ -405,7 +339,8 @@ var I={
   cards:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>',
   audio:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4h3l4 4V6L6 10H3z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg>',
   book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h13a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2V4z"/><path d="M4 18a2 2 0 0 1 2-2h13"/></svg>',
-  chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z"/></svg>'
+  chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z"/></svg>',
+  quiz:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'
 };
 function spkBtn(text){return '<button class="spk" data-spk="'+encodeURIComponent(text)+'" aria-label="Озвучить">'+I.spk+'</button>';}
 
@@ -451,12 +386,13 @@ function beep(){actx=actx||new (window.AudioContext||window.webkitAudioContext)(
 /* ---------------- home stats + go-row ---------------- */
 function renderStats(){
   var w=wordsLearned();
-  document.getElementById("stWords").innerHTML=w+' <small>/ 100</small>';
-  document.getElementById("stWordsBar").style.width=Math.min(100,w)+"%";
+  var TW=0;THEMES.forEach(function(t){TW+=t.words.length;});
+  document.getElementById("stWords").innerHTML=w+' <small>/ '+TW+'</small>';
+  document.getElementById("stWordsBar").style.width=(TW?Math.min(100,w/TW*100):0)+"%";
   document.getElementById("hdBadge").textContent=w+" слов";
   var L=state.lessons.length;
-  document.getElementById("stLessons").innerHTML=L+' <small>/ 4</small>';
-  document.getElementById("stLessonsBar").style.width=(L/4*100)+"%";
+  document.getElementById("stLessons").innerHTML=L+' <small>/ '+LESSONS.length+'</small>';
+  document.getElementById("stLessonsBar").style.width=(LESSONS.length?Math.min(100,L/LESSONS.length*100):0)+"%";
 }
 function renderGo(){
   var box=document.getElementById("goRow");box.innerHTML="";
@@ -464,6 +400,7 @@ function renderGo(){
     ["words","Учить слова","Флешкарты с озвучкой",I.cards],
     ["listen","Слушать фразы","Аудио + перевод",I.audio],
     ["grammar","Грамматика","Уроки и упражнения",I.book],
+    ["practice","Тренажёр","Тесты по словам и грамматике",I.quiz],
     ["chat","Разговор с ИИ","Практика речи",I.chat]
   ];
   items.forEach(function(it){
@@ -690,7 +627,54 @@ document.addEventListener("click",function(e){
 });
 
 /* ---------------- nav ---------------- */
-var VIEWS=[["home","Сегодня",I.home],["words","Слова",I.cards],["listen","Аудио",I.audio],["grammar","Урок",I.book],["chat","Чат",I.chat]];
+/* ---------------- practice (offline mixed quiz) ---------------- */
+var pquiz=null;
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function allWords(){var r=[];THEMES.forEach(function(t){t.words.forEach(function(w){r.push(w);});});return r;}
+function distinct(pool,idx,correct,n){var o=[correct],g=0;while(o.length<n&&g<300){g++;var c=pool[Math.floor(Math.random()*pool.length)][idx];if(o.indexOf(c)<0)o.push(c);}return shuffle(o);}
+function buildQuestions(n){
+  var words=allWords(),qs=[];
+  for(var k=0;k<n;k++){
+    if(Math.random()<0.3&&LESSONS.length){
+      var L=LESSONS[Math.floor(Math.random()*LESSONS.length)],q=L.quiz[Math.floor(Math.random()*L.quiz.length)];
+      qs.push({type:"grammar",prompt:q.q,options:shuffle(q.o.slice()),answer:q.o[q.a],speak:null});
+    }else{
+      var w=words[Math.floor(Math.random()*words.length)],t=Math.random();
+      if(t<0.34)qs.push({type:"en_ru",prompt:w[0],options:distinct(words,1,w[1],4),answer:w[1],speak:w[0]});
+      else if(t<0.67)qs.push({type:"ru_en",prompt:w[1],options:distinct(words,0,w[0],4),answer:w[0],speak:null});
+      else qs.push({type:"listen",prompt:null,options:distinct(words,1,w[1],4),answer:w[1],speak:w[0]});
+    }
+  }
+  return qs;
+}
+function startPractice(){pquiz={qs:buildQuestions(10),i:0,score:0};renderP();}
+function renderP(){
+  var box=document.getElementById("practiceArea");if(!box)return;
+  if(!pquiz){box.innerHTML='<div class="card done-box"><div class="em">\uD83C\uDFAF</div><h3>Тренажёр</h3><p>10 случайных вопросов: слова, аудио и грамматика.</p><button class="start-btn" id="pStart">Начать</button></div>';document.getElementById("pStart").onclick=startPractice;return;}
+  if(pquiz.i>=pquiz.qs.length){var sc=pquiz.score,tot=pquiz.qs.length;box.innerHTML='<div class="card done-box"><div class="em">'+(sc>=tot*0.8?'\uD83C\uDFC6':'\u2705')+'</div><h3>'+sc+' из '+tot+'</h3><p>'+(sc>=tot*0.8?'Отлично!':'Хорошая работа — продолжай!')+'</p><button class="start-btn" id="pAgain">Ещё раз</button></div>';document.getElementById("pAgain").onclick=startPractice;return;}
+  var q=pquiz.qs[pquiz.i];
+  var head='<div class="fc-top"><span>Вопрос '+(pquiz.i+1)+' / '+pquiz.qs.length+'</span><span>Счёт: '+pquiz.score+'</span></div>';
+  var pr;
+  if(q.type==="listen")pr='<div class="card flash" style="min-height:120px;"><div style="font-size:13px;color:var(--muted);">Послушай и выбери перевод</div>'+spkBtn(q.speak)+'</div>';
+  else if(q.type==="grammar")pr='<div class="card" style="padding:18px;text-align:center;"><div style="font-size:12px;color:var(--faint);margin-bottom:6px;">Грамматика</div><div style="font-size:18px;font-weight:700;">'+q.prompt+'</div></div>';
+  else pr='<div class="card flash" style="min-height:120px;"><div class="en" style="font-size:26px;">'+q.prompt+'</div>'+(q.speak?spkBtn(q.speak):'')+'</div>';
+  var opts=q.options.map(function(o){return '<button class="opt" data-o="'+encodeURIComponent(o)+'">'+o+'</button>';}).join("");
+  box.innerHTML=head+pr+'<div class="opts" id="pOpts" style="margin-top:14px;">'+opts+'</div><div id="pNext"></div>';
+  if(q.type==="listen")speak(q.speak);
+  box.querySelectorAll("#pOpts .opt").forEach(function(btn){
+    btn.onclick=function(){
+      var po=document.getElementById("pOpts");if(po.dataset.done)return;po.dataset.done="1";
+      var chosen=decodeURIComponent(this.dataset.o);
+      box.querySelectorAll("#pOpts .opt").forEach(function(b){b.disabled=true;var v=decodeURIComponent(b.dataset.o);if(v===q.answer)b.classList.add("correct");else if(b===btn)b.classList.add("wrong");});
+      if(chosen===q.answer)pquiz.score++;
+      var nb=el('<button class="start-btn" style="margin-top:14px;width:100%;">'+((pquiz.i+1)>=pquiz.qs.length?"Результат":"Далее")+'</button>');
+      document.getElementById("pNext").appendChild(nb);
+      nb.onclick=function(){pquiz.i++;renderP();};
+    };
+  });
+}
+
+var VIEWS=[["home","Сегодня",I.home],["words","Слова",I.cards],["listen","Аудио",I.audio],["grammar","Урок",I.book],["practice","Тест",I.quiz],["chat","Чат",I.chat]];
 function renderNav(){
   var box=document.getElementById("nav");box.innerHTML="";
   VIEWS.forEach(function(v){
@@ -719,8 +703,10 @@ function resetAll(){
   function safe(fn){try{fn();}catch(e){if(window.console)console.error("init step failed:",e);}}
   safe(renderNav);safe(renderTimers);safe(renderGo);
   safe(renderListenThemes);safe(renderListenList);safe(renderLessons);safe(renderChatTopics);
+  safe(renderP);
   safe(function(){
     document.getElementById("trToggle").onclick=function(){showTr=!showTr;this.classList.toggle("on",showTr);renderListenList();};
+    document.getElementById("slowToggle").onclick=function(){this.classList.toggle("on");ttsRate=this.classList.contains("on")?0.6:0.9;};
     document.getElementById("startBtn").onclick=beginChat;
     document.getElementById("chatSend").innerHTML=I.send;
     document.getElementById("chatSend").onclick=sendChat;
