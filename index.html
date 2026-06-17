@@ -209,6 +209,7 @@
   <main>
     <!-- ============ HOME ============ -->
     <section class="view active" id="v-home">
+      <div id="heroCard"></div>
       <div class="stats">
         <div class="card stat"><div class="lab">Выучено слов</div><div class="num" id="stWords">0 <small>/ 100</small></div><div class="mini"><i id="stWordsBar"></i></div></div>
         <div class="card stat"><div class="lab">Уроков пройдено</div><div class="num" id="stLessons">0 <small>/ 16</small></div><div class="mini"><i id="stLessonsBar"></i></div></div>
@@ -222,7 +223,7 @@
       <div class="go-row" id="goRow"></div>
 
       <button class="reset-link" id="resetBtn">Сбросить весь прогресс</button>
-      <div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px;">сборка 12 · понятные уроки грамматики</div>
+      <div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px;">сборка 13 · прокачка героя (XP, уровни)</div>
     </section>
 
     <!-- ============ WORDS ============ -->
@@ -308,7 +309,7 @@ async function saveState(s){
   if(hasWS()){try{await window.storage.set(KEY,JSON.stringify(s));return;}catch(e){}}
   try{if(typeof localStorage!=="undefined")localStorage.setItem(KEY,JSON.stringify(s));}catch(e){}
 }
-var state={srs:{},lessons:[],streak:0,lastDate:"",todayCount:0};
+var state={srs:{},lessons:[],streak:0,lastDate:"",todayCount:0,xp:0};
 function persist(){saveState(state);}
 
 /* ---------------- TTS ---------------- */
@@ -396,16 +397,58 @@ var actx=null;
 function beep(){actx=actx||new (window.AudioContext||window.webkitAudioContext)();[0,.18].forEach(function(d){var o=actx.createGain(),s=actx.createOscillator();s.type="sine";s.frequency.value=880;s.connect(o);o.connect(actx.destination);var t0=actx.currentTime+d;o.gain.setValueAtTime(.0001,t0);o.gain.exponentialRampToValueAtTime(.22,t0+.02);o.gain.exponentialRampToValueAtTime(.0001,t0+.16);s.start(t0);s.stop(t0+.18);});}
 
 /* ---------------- home stats + go-row ---------------- */
+/* ---------------- gamification (RPG hero) ---------------- */
+var HERO_TITLES={1:"Новичок",2:"Ученик",3:"Воин",4:"Рыцарь",5:"Мастер"};
+function heroTier(L){return L>=20?5:L>=15?4:L>=10?3:L>=5?2:1;}
+function needXp(L){return 50*(L-1)*L;}
+function levelFromXp(xp){var L=1;while(needXp(L+1)<=xp)L++;return L;}
+function heroSVG(L){
+  var t=heroTier(L);
+  var tunic=t>=4?"#9AA6B2":(t>=3?"#15803D":"#16A34A");
+  var aura=t>=5?'<circle cx="50" cy="58" r="45" fill="none" stroke="#E0922F" stroke-width="3" opacity=".45"/>':'';
+  var cape=t>=4?'<path d="M34 50 Q50 46 66 50 L70 98 Q50 92 30 98 Z" fill="#15803D" opacity=".9"/>':'';
+  var shield=t>=4?'<path d="M20 58 q0 16 9 22 q9 -6 9 -22 q-9 -3 -18 0 Z" fill="#C7E7D2" stroke="#15803D" stroke-width="2"/>':'';
+  var sword=t>=2?'<line x1="76" y1="40" x2="76" y2="80" stroke="#8A93A0" stroke-width="4" stroke-linecap="round"/><line x1="69" y1="54" x2="83" y2="54" stroke="#6B7280" stroke-width="3" stroke-linecap="round"/>':'';
+  var hair=t<3?'<path d="M38 31 Q50 16 62 31 Q58 24 50 24 Q42 24 38 31 Z" fill="#6B4A2B"/>':'';
+  var helmet=t>=3?'<path d="M37 30 Q50 17 63 30 L63 33 Q50 28 37 33 Z" fill="#8A93A0"/><rect x="48" y="21" width="4" height="9" fill="#E0922F"/>':'';
+  var crown=t>=5?'<path d="M41 15 l3 7 4 -7 4 7 4 -7 3 7 q-9 -3 -18 0 Z" fill="#E0922F"/>':'';
+  return '<svg viewBox="0 0 100 120" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">'+aura+cape+
+    '<ellipse cx="50" cy="113" rx="24" ry="4" fill="rgba(22,32,43,.08)"/>'+
+    '<rect x="44" y="88" width="5" height="22" rx="2.5" fill="#5B6571"/><rect x="51" y="88" width="5" height="22" rx="2.5" fill="#5B6571"/>'+
+    '<rect x="37" y="50" width="26" height="40" rx="9" fill="'+tunic+'"/>'+
+    '<rect x="37" y="74" width="26" height="5" fill="rgba(22,32,43,.18)"/>'+
+    '<rect x="29" y="52" width="8" height="24" rx="4" fill="'+tunic+'"/><rect x="63" y="52" width="8" height="24" rx="4" fill="'+tunic+'"/>'+
+    shield+sword+
+    '<circle cx="50" cy="36" r="12" fill="#F2C79B"/>'+hair+helmet+crown+
+    '<circle cx="46" cy="36" r="1.5" fill="#16202B"/><circle cx="54" cy="36" r="1.5" fill="#16202B"/>'+
+    '<path d="M46 41 Q50 43 54 41" stroke="#16202B" stroke-width="1.2" fill="none" stroke-linecap="round"/>'+
+    '</svg>';
+}
+function addXp(n){var b=levelFromXp(state.xp||0);state.xp=(state.xp||0)+n;var a=levelFromXp(state.xp);persist();renderHero();if(a>b)toast("⬆ Уровень "+a+" — "+HERO_TITLES[heroTier(a)]+"!");}
+function toast(txt){var d=document.getElementById("toast");if(!d){d=document.createElement("div");d.id="toast";d.style.cssText="position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--grow-d);color:#fff;padding:11px 18px;border-radius:999px;font-weight:700;font-size:14px;box-shadow:var(--shadow);z-index:9999;transition:opacity .3s;max-width:90%;text-align:center;";document.body.appendChild(d);}d.textContent=txt;d.style.opacity="1";clearTimeout(window._tt);window._tt=setTimeout(function(){d.style.opacity="0";},2000);}
+function renderHero(){
+  var box=document.getElementById("heroCard");if(!box)return;
+  var xp=state.xp||0,L=levelFromXp(xp),t=heroTier(L);
+  var cur=xp-needXp(L),nxt=needXp(L+1)-needXp(L),pct=nxt?Math.min(100,Math.round(cur/nxt*100)):0;
+  box.innerHTML='<div class="card" style="display:flex;gap:14px;align-items:center;padding:16px;">'+
+    '<div style="width:84px;height:100px;flex:none;">'+heroSVG(L)+'</div>'+
+    '<div style="flex:1;min-width:0;">'+
+      '<div style="font-weight:800;font-size:16px;">'+HERO_TITLES[t]+'</div>'+
+      '<div style="font-size:12.5px;color:var(--muted);margin:2px 0 9px;">Уровень '+L+' · '+xp+' XP</div>'+
+      '<div style="height:9px;background:var(--track);border-radius:99px;overflow:hidden;"><i style="display:block;height:100%;width:'+pct+'%;background:var(--grow);border-radius:99px;"></i></div>'+
+      '<div style="font-size:11px;color:var(--faint);margin-top:6px;">'+cur+' / '+nxt+' XP до уровня '+(L+1)+'</div>'+
+    '</div></div>';
+}
 function todayStr(){var d=new Date();return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();}
 function touchDaily(){
   var t=todayStr();
   if(state.lastDate!==t){
     var yd=new Date(Date.now()-86400000);var y=yd.getFullYear()+"-"+(yd.getMonth()+1)+"-"+yd.getDate();
     state.streak=(state.lastDate===y)?((state.streak||0)+1):1;
-    state.lastDate=t;state.todayCount=0;
+    state.lastDate=t;state.todayCount=0;state.xp=(state.xp||0)+20;
   }
 }
-function addReview(){touchDaily();state.todayCount=(state.todayCount||0)+1;persist();renderStats();}
+function addReview(){touchDaily();state.todayCount=(state.todayCount||0)+1;persist();renderStats();addXp(10);}
 function renderStats(){
   var w=wordsLearned();
   var TW=0;THEMES.forEach(function(t){TW+=t.words.length;});
@@ -587,7 +630,7 @@ function renderLessons(){
   box.querySelectorAll("[data-done]").forEach(function(btn){
     btn.onclick=function(){
       var id=this.dataset.done;
-      if(state.lessons.indexOf(id)<0){state.lessons.push(id);persist();renderStats();this.classList.add("is-done");this.textContent="✓ Урок пройден";document.getElementById("ls-"+LESSONS.findIndex(function(x){return x.id===id;})).classList.add("done");}
+      if(state.lessons.indexOf(id)<0){state.lessons.push(id);addXp(50);persist();renderStats();this.classList.add("is-done");this.textContent="✓ Урок пройден";document.getElementById("ls-"+LESSONS.findIndex(function(x){return x.id===id;})).classList.add("done");}
     };
   });
 }
@@ -785,8 +828,8 @@ function go(v){
 /* ---------------- reset ---------------- */
 function resetAll(){
   if(!confirm("Сбросить весь прогресс? Слова и пройденные уроки обнулятся."))return;
-  state={srs:{},lessons:[],streak:0,lastDate:"",todayCount:0};persist();
-  renderStats();renderWordThemes();renderLessons();
+  state={srs:{},lessons:[],streak:0,lastDate:"",todayCount:0,xp:0};persist();
+  renderStats();renderWordThemes();renderLessons();renderHero();
 }
 
 /* ---------------- init ---------------- */
@@ -794,7 +837,7 @@ function resetAll(){
   function safe(fn){try{fn();}catch(e){if(window.console)console.error("init step failed:",e);}}
   safe(renderNav);safe(renderTimers);safe(renderGo);
   safe(renderListenThemes);safe(renderListenList);safe(renderLessons);safe(renderChatTopics);
-  safe(renderP);safe(renderReadings);safe(renderPscope);
+  safe(renderP);safe(renderReadings);safe(renderPscope);safe(renderHero);
   safe(function(){
     document.getElementById("trToggle").onclick=function(){showTr=!showTr;this.classList.toggle("on",showTr);renderListenList();};
     document.getElementById("slowToggle").onclick=function(){this.classList.toggle("on");ttsRate=this.classList.contains("on")?0.6:0.9;};
@@ -811,7 +854,7 @@ function resetAll(){
     if(saved&&typeof saved==="object"){
       state.srs=(saved.srs&&typeof saved.srs==="object")?saved.srs:{};
       state.lessons=Array.isArray(saved.lessons)?saved.lessons:[];
-      state.streak=saved.streak||0;state.lastDate=saved.lastDate||"";state.todayCount=saved.todayCount||0;
+      state.streak=saved.streak||0;state.lastDate=saved.lastDate||"";state.todayCount=saved.todayCount||0;state.xp=saved.xp||0;
     }
   }catch(e){}
   safe(renderStats);safe(renderWordThemes);
